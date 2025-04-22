@@ -1,0 +1,222 @@
+/* Общие стили */
+body {
+    background-color: #000927; /* Темно-серый фон */
+    color: #ddd; /* Светло-серый текст */
+    font-family: 'Courier New', monospace; /* Моноширинный шрифт */
+    margin: 0;
+    padding: 0;
+    overflow: hidden; /* Предотвращает полосы прокрутки */
+}
+
+/* Контейнер */
+.container {
+    display: flex;
+    height: 100vh;
+}
+
+/* Боковая панель */
+.sidebar {
+    position: relative;
+    width: 250px;
+    background-color: #00021e; /* Темный фон для сайдбара */
+    padding: 20px;
+    border-right: 1px solid #333; /* Разделительная линия */
+}
+
+.sidebar-header {
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.sidebar-header h1 {
+    color: #64ffda; /* Бирюзовый цвет для заголовка */
+    font-size: 24px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.channels, .direct-messages {
+    margin-bottom: 20px;
+}
+
+.channels h3, .direct-messages h3 {
+    color: #79ff4c; 
+    font-size: 16px;
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.channels ul, .direct-messages ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.channels li, .direct-messages li {
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.channels li:hover, .direct-messages li:hover {
+    background-color: #03005c;
+    border-radius: 5px; /* Затемнение при наведении */
+}
+
+.name {
+    display: flex;
+    flex-direction: row;
+}
+
+/* Кнопки и формы */
+.add-button {
+    background-color: #64ffda; /* Бирюзовая кнопка */
+    color: #121212;
+    border: none;
+    padding: 5px 10px;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: background-color 0.2s ease;
+    font-size: 14px;
+}
+
+h2 {
+    padding: 0px;
+    margin: 0px;
+}
+
+.name-button {
+    background-color: #64ffda; /* Бирюзовая кнопка */
+    color: #121212;
+    border: none;
+    height: 32px;
+    padding: 5px 10px;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: background-color 0.2s ease;
+    font-size: 14px;
+}
+
+.close-button {
+    background-color: #4e0000; /* Бирюзовая кнопка */
+    color: #ff6e6e;
+    border: none;
+    padding: 5px 10px;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: background-color 0.2s ease;
+    font-size: 14px;
+}
+
+.add-button:hover {
+    background-color: #4588a0; /* Более темный зеленый при наведении */
+}
+
+.add-input {
+    background-color: #333;
+    color: #ddd;
+    border: none;
+    padding: 8px;
+    margin-bottom: 5px;
+    border-radius: 3px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.my-name {
+    width: 80%;
+    display: flex;
+    flex-direction: column;
+    position: absolute;
+    bottom: 15px;
+    justify-content: space-between;
+    flex-grow: 1;
+}
+
+.name-text {
+    margin-bottom: 5px;
+}
+
+.my-name-input {
+    margin-right: 10px;
+    background-color: #071e00;
+    color: #ffffff;
+    border: none;
+    padding: 8px;
+    margin-bottom: 5px;
+    border-radius: 3px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Основной контент */
+.main-content {
+    flex-grow: 1;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+.chat-header {
+    margin-bottom: 20px;
+    border-bottom: 1px solid #333;
+    padding-bottom: 10px;
+}
+
+.chat-header h2 {
+    color: #64ffda;
+    font-size: 20px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.chat-window {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 10px;
+}
+
+.message {
+    margin-bottom: 10px;
+    padding: 8px 12px;
+    border-radius: 5px;
+    background-color: #001f2e;
+}
+
+.user {
+    color: #79ff4c;
+    font-weight: bold;
+    margin-right: 5px;
+}
+
+.message-input {
+    display: flex;
+    margin-top: 10px;
+}
+
+.message-input input[type="text"] {
+    flex-grow: 1;
+    background-color: #001f2e;
+    color: #ddd;
+    border: none;
+    padding: 8px;
+    border-radius: 3px;
+    margin-right: 10px;
+}
+
+.message-input button {
+    background-color: #64ffda;
+    color: #121212;
+    border: none;
+    padding: 8px 12px;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: background-color 0.2s ease;
+}
+
+.message-input button:hover {
+    background-color: #4588a0;
+}

@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Slack-клон</title>
+        <link rel="stylesheet" href="style.css" />
+    </head>
+    <body>
+        <div class="container">
+            <aside class="sidebar" id="sidebar">
+                <div class="sidebar-header">
+                    <h1>Мой Slack</h1>
+                </div>
+                <div class="channels">
+                    <h3>
+                        Каналы
+                        <button class="add-button" id="add-channel-button">
+                            +
+                        </button>
+                    </h3>
+                    <ul id="channel-list">
+                    </ul>
+                    <div id="add-channel-form" style="display: none">
+                        <input
+                            type="text"
+                            id="new-channel-name"
+                            class="add-input"
+                            placeholder="Название канала"
+                        />
+                        <button class="add-button" id="create-channel-button">
+                            Создать
+                        </button>
+                        <button class="close-button" id="close-channel-button">
+                            Отмена
+                        </button>
+                    </div>
+                </div>
+                <div class="direct-messages">
+                    <h3>
+                        Личные сообщения
+                        <button class="add-button" id="add-dm-button">+</button>
+                    </h3>
+                    <ul id="dm-list">
+                    </ul>
+                    <div id="add-dm-form" style="display: none">
+                        <input
+                            type="text"
+                            id="new-dm-name"
+                            class="add-input"
+                            placeholder="Имя пользователя"
+                        />
+                        <button class="add-button" id="create-dm-button">
+                            Создать
+                        </button>
+                        <button class="close-button" id="close-dm-button">
+                            Отмена
+                        </button>
+                    </div>
+                </div>
+                <div class="my-name">
+                    <h2 class="name-text">Имя:</h2>
+                    <h2 class="name-text" id="name" style="display: none"></h2>
+                    <div class="name" id="add-name">
+                        <input
+                            type="text"
+                            id="my-name"
+                            class="my-name-input"
+                            placeholder="Введите имя..."
+                        />
+                        <button class="name-button" id="add-name-button">
+                            OK
+                        </button>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="main-content">
+                <div class="chat-header">
+                    <h2 id="current-chat-title"></h2>
+                </div>
+                <div class="chat-window" id="chat-window">
+                </div>
+                <div class="message-input" id="message-input" style="display: none;">
+                    <input
+                        type="text"
+                        id="message-text"
+                        placeholder="Напишите сообщение..."
+                    />
+                    <button id="send-button">Отправить</button>
+                </div>
+            </main>
+        </div>
+
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.8.1/socket.io.js"></script>
+        <script>
+            const name = document.getElementById("name");
+            const addName = document.getElementById("add-name");
+            const myNameInput = document.getElementById("my-name");
+            const addNameButton = document.getElementById("add-name-button");
+            const sidebar = document.getElementById("sidebar");
+            const chatWindow = document.getElementById("chat-window");
+            const messageText = document.getElementById("message-text");
+            const sendButton = document.getElementById("send-button");
+            const channelList = document.getElementById("channel-list");
+            const dmList = document.getElementById("dm-list");
+            const addChannelButton = document.getElementById("add-channel-button");
+            const addDMButton = document.getElementById("add-dm-button");
+            const addChannelForm = document.getElementById("add-channel-form");
+            const addDMForm = document.getElementById("add-dm-form");
+            const newChannelName = document.getElementById("new-channel-name");
+            const newDMName = document.getElementById("new-dm-name");
+            const createChannelButton = document.getElementById(
+                "create-channel-button"
+            );
+            const createDMButton = document.getElementById("create-dm-button");
+            const closeChannelButton = document.getElementById(
+                "close-channel-button"
+            );
+            const closeDMButton = document.getElementById("close-dm-button");
+            const currentChatTitle =
+                document.getElementById("current-chat-title");
+            const messageInput = document.getElementById("message-input");
+
+            let myRoom = "";
+            let activeRoom = "";
+            let inChannel = false;
+            let directs = [];
+
+            const socket = io("http://localhost:3000");
+
+            socket.on("chats", (data) => {
+                channelList.innerHTML = "";
+                dmList.innerHTML = "";
+
+                console.log("object");
+
+                for(let channel of data.channels) {
+                    addItemToList(channelList, channel.channelName, "channel");
+                    socket.emit("joinRoom", { room: channel.channelName });
+                }
+                for(let user of data.directs) {
+                    const userName = user.users[0].user.name === myRoom ? user.users[1].user.name: user.users[0].user.name;
+                    directs.push(userName);
+                    addItemToList(dmList, userName);
+                }
+            })
+
+            socket.on("message", (data) => {
+                if (!checkLiItemInList(data.from) && !data.channel) {
+                    addItemToList(dmList, data.from, "dm");
+                }
+
+                if (data.from == activeRoom) {
+                    const text = data.text;
+                    if (text.trim() !== "") {
+                        const newMessage = document.createElement("div");
+                        newMessage.classList.add("message");
+                        newMessage.innerHTML = `<span class="user">${data.from}:</span> <span class="text">${text}</span>`;
+                        chatWindow.appendChild(newMessage);
+                        messageText.value = ""; // Очистить поле ввода
+                        chatWindow.scrollTop = chatWindow.scrollHeight; // Прокрутить вниз
+                    }
+                } else {
+                    const chat = document.getElementById(`chat-${data.from}`);
+                    chat.style.color = "#79ff4c";
+                }
+            });
+
+            socket.on("messages", data => {
+                chatWindow.innerHTML = "";
+                for(let message of data) {
+                    console.log(message);
+                    const newMessage = document.createElement("div");
+                    newMessage.classList.add("message");
+                    newMessage.innerHTML = `<span class="user">${message.user.name === myRoom ? "Вы" : message.user.name}:</span> <span class="text">${message.text}</span>`;
+                    chatWindow.appendChild(newMessage);
+                    messageText.value = ""; // Очистить поле ввода
+                    chatWindow.scrollTop = chatWindow.scrollHeight; 
+                }
+            });
+
+            function checkLiItemInList(item) {
+                const liElems = [];
+
+                for (let li of dmList.querySelectorAll("li")) {
+                    liElems.push(li.textContent);
+                }
+
+                console.log(liElems);
+
+                return liElems.includes(item);
+            }
+
+            addNameButton.addEventListener("click", () => {
+                if (myNameInput.value !== "") {
+                    myRoom = myNameInput.value;
+
+                    socket.emit("register", { name: myRoom });
+                    socket.emit("joinRoom", { room: myRoom });
+
+                    name.textContent = myNameInput.value;
+                    name.style.display = "block";
+                    addName.style.display = "none";
+
+                    socket.emit("getChats", {name: myRoom});
+
+                    chatWindow.innerHTML = "";
+                }
+            });
+
+            // Функция для отправки сообщения
+            sendButton.addEventListener("click", function () {
+                const text = messageText.value;
+                if (text.trim() !== "") {
+                    const newMessage = document.createElement("div");
+                    newMessage.classList.add("message");
+                    newMessage.innerHTML = `<span class="user">Вы:</span> <span class="text">${text}</span>`;
+                    chatWindow.appendChild(newMessage);
+                    messageText.value = ""; // Очистить поле ввода
+                    chatWindow.scrollTop = chatWindow.scrollHeight; // Прокрутить вниз
+                    socket.emit("newMessage", {
+                        text,
+                        from: myRoom,
+                        to: activeRoom,
+                        room: activeRoom,
+                        channel: inChannel,
+                    });
+                    if (!inChannel && !directs.includes(activeRoom)) {
+                        socket.emit("joinChat", { name: myRoom, forName: activeRoom });
+                    }
+                }
+            });
+
+            // Докрутка до последнего сообщения при загрузке
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+
+            // Функция для добавления канала или личного сообщения в список
+            function addItemToList(listElement, itemName, itemType) {
+                const newItem = document.createElement("li");
+                newItem.textContent = itemName;
+                newItem.id = `chat-${itemName}`;
+
+                newItem.addEventListener("click", () => {
+                    if (newItem.textContent !== activeRoom) {
+                        inChannel = itemType === "channel";
+                        activeRoom = newItem.textContent;
+
+                        newItem.style.color = "#ffffff";
+                        messageInput.style.display = "flex";
+                        currentChatTitle.textContent = itemName;
+                        //  Здесь можно добавить логику для загрузки сообщений для выбранного канала/сообщения
+                        chatWindow.innerHTML = ""; // Очистить окно чата (заглушка)
+
+                        if (inChannel) {
+                            socket.emit("getMessages", { from: myRoom, channelName: activeRoom });
+                        } else {
+                            socket.emit("getMessages", { from: myRoom, to: activeRoom });
+                        }
+                    }
+                });
+                listElement.appendChild(newItem);
+                return newItem;
+            }
+
+            // Обработчики для добавления каналов
+            addChannelButton.addEventListener("click", () => {
+                addChannelForm.style.display = "block";
+            });
+
+            closeChannelButton.addEventListener("click", () => {
+                newChannelName.value = "";
+                addChannelForm.style.display = "none";
+            });
+
+            createChannelButton.addEventListener("click", () => {
+                const channelName = newChannelName.value.trim();
+                if (channelName !== "") {
+                    activeRoom = channelName;
+                    const newItem = addItemToList(channelList, channelName, "channel");
+                    newChannelName.value = "";
+                    addChannelForm.style.display = "none";
+
+                    socket.emit("joinRoom", { room: channelName });
+                    socket.emit("joinChat", { name: myRoom, channelName});
+
+                    inChannel = true;
+                    activeRoom = newItem.textContent;
+
+                    newItem.style.color = "#ffffff";
+                    messageInput.style.display = "flex";
+                    currentChatTitle.textContent = channelName;
+                    //  Здесь можно добавить логику для загрузки сообщений для выбранного канала/сообщения
+                    chatWindow.innerHTML = "";
+
+                    if (inChannel) {
+                        socket.emit("getMessages", { from: myRoom, channelName: activeRoom });
+                    } else {
+                        socket.emit("getMessages", { from: myRoom, to: activeRoom });
+                    }
+                }
+            });
+
+            // Обработчики для добавления личных сообщений
+            addDMButton.addEventListener("click", () => {
+                addDMForm.style.display = "block";
+            });
+
+            closeDMButton.addEventListener("click", () => {
+                newDMName.value = "";
+                addDMForm.style.display = "none";
+            });
+
+            createDMButton.addEventListener("click", () => {
+                const dmName = newDMName.value.trim();
+                if (dmName !== "") {
+                    activeRoom = dmName;
+                    const newItem = addItemToList(dmList, dmName, "dm");
+                    inChannel = false;
+                    activeRoom = newItem.textContent;
+
+                    newItem.style.color = "#ffffff";
+                    messageInput.style.display = "flex";
+                    currentChatTitle.textContent = dmName;
+                    //  Здесь можно добавить логику для загрузки сообщений для выбранного канала/сообщения
+                    chatWindow.innerHTML = "";
+
+                    if (inChannel) {
+                        socket.emit("getMessages", { from: myRoom, channelName: activeRoom });
+                    } else {
+                        socket.emit("getMessages", { from: myRoom, to: activeRoom });
+                    }
+
+                    newDMName.value = "";
+                    addDMForm.style.display = "none";
+                }
+            });
+        </script>
+    </body>
+</html>
