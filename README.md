@@ -33,8 +33,8 @@ Online communication application
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/your-username/Online-Chat.git
-cd Messaging-Platform
+git clone https://github.com/AlanKerry1/Online-Chat.git
+cd Online-Chat
 
 # 2. Install dependencies
 cd server
