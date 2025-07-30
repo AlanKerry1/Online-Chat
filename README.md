@@ -4,7 +4,7 @@ Online communication application
 
 ## 🚀 Demo
 
-🌐 Coming soon...
+🌐 https://alankerry.ru:7772
 
 ---
 
