@@ -19,8 +19,7 @@
                             +
                         </button>
                     </h3>
-                    <ul id="channel-list">
-                    </ul>
+                    <ul id="channel-list"></ul>
                     <div id="add-channel-form" style="display: none">
                         <input
                             type="text"
@@ -41,8 +40,7 @@
                         Личные сообщения
                         <button class="add-button" id="add-dm-button">+</button>
                     </h3>
-                    <ul id="dm-list">
-                    </ul>
+                    <ul id="dm-list"></ul>
                     <div id="add-dm-form" style="display: none">
                         <input
                             type="text"
@@ -79,9 +77,12 @@
                 <div class="chat-header">
                     <h2 id="current-chat-title"></h2>
                 </div>
-                <div class="chat-window" id="chat-window">
-                </div>
-                <div class="message-input" id="message-input" style="display: none;">
+                <div class="chat-window" id="chat-window"></div>
+                <div
+                    class="message-input"
+                    id="message-input"
+                    style="display: none"
+                >
                     <input
                         type="text"
                         id="message-text"
@@ -104,7 +105,8 @@
             const sendButton = document.getElementById("send-button");
             const channelList = document.getElementById("channel-list");
             const dmList = document.getElementById("dm-list");
-            const addChannelButton = document.getElementById("add-channel-button");
+            const addChannelButton =
+                document.getElementById("add-channel-button");
             const addDMButton = document.getElementById("add-dm-button");
             const addChannelForm = document.getElementById("add-channel-form");
             const addDMForm = document.getElementById("add-dm-form");
@@ -127,31 +129,33 @@
             let inChannel = false;
             let directs = [];
 
-            const socket = io("http://localhost:3000");
+            const socket = io("http://localhost:5000");
 
             socket.on("chats", (data) => {
                 channelList.innerHTML = "";
                 dmList.innerHTML = "";
 
-                console.log("object");
-
-                for(let channel of data.channels) {
+                for (let channel of data.channels) {
                     addItemToList(channelList, channel.channelName, "channel");
                     socket.emit("joinRoom", { room: channel.channelName });
                 }
-                for(let user of data.directs) {
-                    const userName = user.users[0].user.name === myRoom ? user.users[1].user.name: user.users[0].user.name;
+                for (let user of data.directs) {
+                    const userName =
+                        user.users[0].user.name === myRoom
+                            ? user.users[1].user.name
+                            : user.users[0].user.name;
                     directs.push(userName);
                     addItemToList(dmList, userName);
                 }
-            })
+            });
 
             socket.on("message", (data) => {
+                console.log(data);
                 if (!checkLiItemInList(data.from) && !data.channel) {
                     addItemToList(dmList, data.from, "dm");
                 }
 
-                if (data.from == activeRoom) {
+                if (data.from == activeRoom || data.channelName == activeRoom) {
                     const text = data.text;
                     if (text.trim() !== "") {
                         const newMessage = document.createElement("div");
@@ -162,21 +166,32 @@
                         chatWindow.scrollTop = chatWindow.scrollHeight; // Прокрутить вниз
                     }
                 } else {
-                    const chat = document.getElementById(`chat-${data.from}`);
+                    let chat;
+
+                    if (data.channelName) {
+                        chat = document.getElementById(
+                            `chat-${data.channelName}`
+                        );
+                    } else {
+                        chat = document.getElementById(`chat-${data.from}`);
+                    }
+                    console.log(chat);
+
                     chat.style.color = "#79ff4c";
                 }
             });
 
-            socket.on("messages", data => {
+            socket.on("messages", (data) => {
                 chatWindow.innerHTML = "";
-                for(let message of data) {
-                    console.log(message);
+                for (let message of data) {
                     const newMessage = document.createElement("div");
                     newMessage.classList.add("message");
-                    newMessage.innerHTML = `<span class="user">${message.user.name === myRoom ? "Вы" : message.user.name}:</span> <span class="text">${message.text}</span>`;
+                    newMessage.innerHTML = `<span class="user">${
+                        message.user.name === myRoom ? "Вы" : message.user.name
+                    }:</span> <span class="text">${message.text}</span>`;
                     chatWindow.appendChild(newMessage);
                     messageText.value = ""; // Очистить поле ввода
-                    chatWindow.scrollTop = chatWindow.scrollHeight; 
+                    chatWindow.scrollTop = chatWindow.scrollHeight;
                 }
             });
 
@@ -186,8 +201,6 @@
                 for (let li of dmList.querySelectorAll("li")) {
                     liElems.push(li.textContent);
                 }
-
-                console.log(liElems);
 
                 return liElems.includes(item);
             }
@@ -203,7 +216,7 @@
                     name.style.display = "block";
                     addName.style.display = "none";
 
-                    socket.emit("getChats", {name: myRoom});
+                    socket.emit("getChats", { name: myRoom });
 
                     chatWindow.innerHTML = "";
                 }
@@ -219,6 +232,20 @@
                     chatWindow.appendChild(newMessage);
                     messageText.value = ""; // Очистить поле ввода
                     chatWindow.scrollTop = chatWindow.scrollHeight; // Прокрутить вниз
+                    if (!inChannel && !directs.includes(activeRoom)) {
+                        socket.emit("joinChat", {
+                            name: myRoom,
+                            forName: activeRoom,
+                            message: {
+                                text,
+                                from: myRoom,
+                                to: activeRoom,
+                                room: activeRoom,
+                                channel: inChannel,
+                            },
+                        });
+                        return;
+                    }
                     socket.emit("newMessage", {
                         text,
                         from: myRoom,
@@ -226,9 +253,6 @@
                         room: activeRoom,
                         channel: inChannel,
                     });
-                    if (!inChannel && !directs.includes(activeRoom)) {
-                        socket.emit("joinChat", { name: myRoom, forName: activeRoom });
-                    }
                 }
             });
 
@@ -253,9 +277,15 @@
                         chatWindow.innerHTML = ""; // Очистить окно чата (заглушка)
 
                         if (inChannel) {
-                            socket.emit("getMessages", { from: myRoom, channelName: activeRoom });
+                            socket.emit("getMessages", {
+                                from: myRoom,
+                                channelName: activeRoom,
+                            });
                         } else {
-                            socket.emit("getMessages", { from: myRoom, to: activeRoom });
+                            socket.emit("getMessages", {
+                                from: myRoom,
+                                to: activeRoom,
+                            });
                         }
                     }
                 });
@@ -277,12 +307,16 @@
                 const channelName = newChannelName.value.trim();
                 if (channelName !== "") {
                     activeRoom = channelName;
-                    const newItem = addItemToList(channelList, channelName, "channel");
+                    const newItem = addItemToList(
+                        channelList,
+                        channelName,
+                        "channel"
+                    );
                     newChannelName.value = "";
                     addChannelForm.style.display = "none";
 
                     socket.emit("joinRoom", { room: channelName });
-                    socket.emit("joinChat", { name: myRoom, channelName});
+                    socket.emit("joinChat", { name: myRoom, channelName });
 
                     inChannel = true;
                     activeRoom = newItem.textContent;
@@ -294,9 +328,15 @@
                     chatWindow.innerHTML = "";
 
                     if (inChannel) {
-                        socket.emit("getMessages", { from: myRoom, channelName: activeRoom });
+                        socket.emit("getMessages", {
+                            from: myRoom,
+                            channelName: activeRoom,
+                        });
                     } else {
-                        socket.emit("getMessages", { from: myRoom, to: activeRoom });
+                        socket.emit("getMessages", {
+                            from: myRoom,
+                            to: activeRoom,
+                        });
                     }
                 }
             });
@@ -326,9 +366,15 @@
                     chatWindow.innerHTML = "";
 
                     if (inChannel) {
-                        socket.emit("getMessages", { from: myRoom, channelName: activeRoom });
+                        socket.emit("getMessages", {
+                            from: myRoom,
+                            channelName: activeRoom,
+                        });
                     } else {
-                        socket.emit("getMessages", { from: myRoom, to: activeRoom });
+                        socket.emit("getMessages", {
+                            from: myRoom,
+                            to: activeRoom,
+                        });
                     }
 
                     newDMName.value = "";

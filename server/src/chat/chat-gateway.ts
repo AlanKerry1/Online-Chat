@@ -7,6 +7,7 @@ import { JoinChatDto } from "./dto/join-chat.dto";
 import { GetChatsDto } from "./dto/get-chats.dto";
 import { SendMessageDto } from "./dto/send-message.dto";
 import { GetMessagesDto } from "./dto/get-messages.dto";
+import { channel } from "diagnostics_channel";
 
 @WebSocketGateway({cors: {origin: "*"}})
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
@@ -17,7 +18,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     @SubscribeMessage("newMessage")
     handleMessage(client: Socket, sendMessageDto: SendMessageDto) {
-        client.broadcast.to(sendMessageDto.room).emit("message", {text: sendMessageDto.text, from: sendMessageDto.channel ? sendMessageDto.to : sendMessageDto.from, channel: sendMessageDto.channel});
+        client.broadcast.to(sendMessageDto.room).emit("message", {text: sendMessageDto.text, from: sendMessageDto.from, channel: sendMessageDto.channel, channelName: sendMessageDto.channel ? sendMessageDto.to : null});
         client.broadcast.to(sendMessageDto.from).emit("myMessage", {text: sendMessageDto.text, from: sendMessageDto.to})
         this.db.sendMessage(sendMessageDto);
     }
@@ -25,15 +26,23 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @SubscribeMessage("joinRoom")
     joinRoom(client: Socket, message: {room: string}) {
         client.join(message.room);
-        console.log(client.rooms);
     }
     
     @SubscribeMessage("joinChat")
     joinChat(client: Socket, joinChatDto: JoinChatDto) {
+        const message = joinChatDto.message;
         if (joinChatDto.channelName) {
-            this.db.addUserToChannel(joinChatDto);
+            this.db.addUserToChannel(joinChatDto, message);
+            if (message) {
+                client.broadcast.to(message.room).emit("message", {text: message.text, from: message.from, channel: message.channel, channelName: message.channel ? message.to : null});
+                client.broadcast.to(message.from).emit("myMessage", {text: message.text, from: message.to})
+            }
         } else {
-            this.db.addDirectChat(joinChatDto);
+            this.db.addDirectChat(joinChatDto, message);
+            if (message) {
+                client.broadcast.to(message.room).emit("message", {text: message.text, from: message.from, channel: message.channel, channelName: message.channel ? message.to : null});
+                client.broadcast.to(message.from).emit("myMessage", {text: message.text, from: message.to})
+            }
         }
     }
 

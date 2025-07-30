@@ -9,231 +9,285 @@ import { GetMessagesDto } from '../dto/get-messages.dto';
 
 @Injectable()
 export class DBService {
-    constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) {}
 
-    async register(registerDto: RegisterDto) {
-        const candidate = await this.prisma.user.findUnique({
-            where: {
-                name: registerDto.name
-            }
-        })
+  async register(registerDto: RegisterDto) {
+    const candidate = await this.prisma.user.findFirst({
+      where: {
+        name: registerDto.name,
+      },
+    });
 
-        if (!candidate) {
-            return await this.prisma.user.create({data: {name: registerDto.name}});
-        }
+    const channel = await this.prisma.channelChat.findFirst({
+      where: {
+        channelName: registerDto.name,
+      },
+    });
+
+    if (!candidate && !channel) {
+      return await this.prisma.user.create({
+        data: { name: registerDto.name },
+      });
     }
+  }
 
-    async addDirectChat(joinChatDto: JoinChatDto) {
-        const user = await this.prisma.user.findUnique({where: {name: joinChatDto.name}});
-        const forUser = await this.prisma.user.findUnique({where: {name: joinChatDto.forName}});
+  async addDirectChat(joinChatDto: JoinChatDto, message?: SendMessageDto) {
+    const user = await this.prisma.user.findFirst({
+      where: { name: joinChatDto.name },
+    });
+    const forUser = await this.prisma.user.findFirst({
+      where: { name: joinChatDto.forName },
+    });
 
-        return await this.prisma.directChat.create({
-            data: {
-                users: {
-                    create: [
-                        {
-                            user: {
-                                connect: {id: Number(user?.id)}
-                            }
-                        },
-                        {
-                            user: {
-                                connect: {id: Number(forUser?.id)}
-                            }
-                        }
-                    ]
-                }
-            }
-        });
-    }
-
-    async addUserToChannel(joinChatDto: JoinChatDto) {
-        const user = await this.prisma.user.findUnique({where: {name: joinChatDto.name}});
-        
-        const userInChannel = await this.prisma.user.findFirst({
-            where: {
-                name: user?.name,
-                channelChats: {
-                    some: {
-                        chat: {
-                            channelName: joinChatDto.channelName,
-                        }
-                    }
-                }
-            }
-        })
-        
-        if (userInChannel) return;
-        
-        const channel = await this.prisma.channelChat.findUnique({where: {channelName: joinChatDto.channelName}});
-
-        if (channel) {
-            return await this.prisma.channelChat.update({
-                where: {channelName: joinChatDto.channelName},
-                data: {
-                    users: {
-                        create: [
-                            {
-                                user: {
-                                    connect: {id: Number(user?.id)}
-                                }
-                            }
-                        ]
-                    }
-                }
-            });
-        }
-
-        return await this.prisma.channelChat.create({
-            data: {
-                channelName: joinChatDto.channelName,
-                users: {
-                    create: [
-                        {
-                            user: {
-                                connect: {id: Number(user?.id)}
-                            }
-                        }
-                    ]
-                }
-            }
-        });
-    }
-
-    async getChats(getChatsDto: GetChatsDto) { 
-        const chats = {};   
-
-        const channels = await this.prisma.channelChat.findMany({
-            where: {
-                users: {
-                    some: {
-                        user: {
-                            name: getChatsDto.name,
-                        }
-                    }
-                }
-            }
-        });
-
-        const directs = await this.prisma.directChat.findMany({
-            where: {
-                users: {
-                    some: {
-                        user: {
-                            name: getChatsDto.name,
-                        }
-                    }
-                }
+    const chatAlreadyCreated = await this.prisma.directChat.findFirst({
+      where: {
+        users: {
+          some: {
+            userId: user?.id,
+          },
+        },
+        AND: {
+          users: {
+            some: {
+              userId: forUser?.id,
             },
-            include: {
-                users: {
-                    include: {
-                        user: true
-                    }
-                }
-            }
-        });
+          },
+        },
+      },
+    });
 
-        return {channels, directs}
-    }
+    if (chatAlreadyCreated) return;
+    if (!forUser) return;
 
-    async sendMessage(sendMessageDto: SendMessageDto) {
-        const res = await this.prisma.user.update({where: {name: sendMessageDto.from},
-            data: {
-                messages: {
-                    create: [
-                        {text: sendMessageDto.text},
-                    ]
-                }
+    const newChat = await this.prisma.directChat.create({
+      data: {
+        users: {
+          create: [
+            {
+              user: {
+                connect: { id: Number(user?.id) },
+              },
             },
+            {
+              user: {
+                connect: { id: Number(forUser?.id) },
+              },
+            },
+          ],
+        },
+      },
+    });
+
+    if (message) await this.sendMessage(message);
+
+    return newChat;
+  }
+
+  async addUserToChannel(joinChatDto: JoinChatDto, message?: SendMessageDto) {
+    const user = await this.prisma.user.findFirst({
+      where: { name: joinChatDto.name },
+    });
+
+    const userInChannel = await this.prisma.user.findFirst({
+      where: {
+        name: user?.name,
+        channelChats: {
+          some: {
+            chat: {
+              channelName: joinChatDto.channelName,
+            },
+          },
+        },
+      },
+    });
+
+    if (userInChannel) return;
+
+    const channel = await this.prisma.channelChat.findFirst({
+      where: { channelName: joinChatDto.channelName },
+    });
+
+    if (channel) {
+      return await this.prisma.channelChat.update({
+        where: { channelName: joinChatDto.channelName },
+        data: {
+          users: {
+            create: [
+              {
+                user: {
+                  connect: { id: Number(user?.id) },
+                },
+              },
+            ],
+          },
+        },
+      });
+    }
+
+    const candidate = await this.prisma.user.findFirst({
+      where: {
+        name: joinChatDto.channelName,
+      },
+    });
+
+    if (candidate) return;
+
+    const newChannel = await this.prisma.channelChat.create({
+      data: {
+        channelName: joinChatDto.channelName,
+        users: {
+          create: [
+            {
+              user: {
+                connect: { id: Number(user?.id) },
+              },
+            },
+          ],
+        },
+      },
+    });
+
+    if (message) await this.sendMessage(message);
+
+    return newChannel;
+  }
+
+  async getChats(getChatsDto: GetChatsDto) {
+    const chats = {};
+
+    const channels = await this.prisma.channelChat.findMany({
+      where: {
+        users: {
+          some: {
+            user: {
+              name: getChatsDto.name,
+            },
+          },
+        },
+      },
+    });
+
+    const directs = await this.prisma.directChat.findMany({
+      where: {
+        users: {
+          some: {
+            user: {
+              name: getChatsDto.name,
+            },
+          },
+        },
+      },
+      include: {
+        users: {
+          include: {
+            user: true,
+          },
+        },
+      },
+    });
+
+    return { channels, directs };
+  }
+
+  async sendMessage(sendMessageDto: SendMessageDto) {
+    const res = await this.prisma.user.update({
+      where: { name: sendMessageDto.from },
+      data: {
+        messages: {
+          create: [{ text: sendMessageDto.text }],
+        },
+      },
+      include: {
+        messages: true,
+      },
+    });
+    const message = res.messages.at(-1);
+
+    if (sendMessageDto.channel) {
+      return await this.prisma.channelChat.update({
+        where: {
+          channelName: sendMessageDto.to,
+        },
+        data: {
+          messages: {
+            connect: {
+              id: message?.id,
+            },
+          },
+        },
+      });
+    } else {
+      const direct = await this.prisma.directChat.findFirst({
+        where: {
+          users: {
+            some: {
+              user: { name: sendMessageDto.to },
+            },
+          },
+          AND: {
+            users: {
+              some: {
+                user: { name: sendMessageDto.from },
+              },
+            },
+          },
+        },
+      });
+
+      if (!direct) return;
+
+      return await this.prisma.directChat.update({
+        where: {
+          id: direct?.id,
+        },
+        data: {
+          messages: {
+            connect: {
+              id: message?.id,
+            },
+          },
+        },
+      });
+    }
+  }
+
+  async getMessages(getMessagesDto: GetMessagesDto) {
+    if (getMessagesDto.channelName) {
+      const res = await this.prisma.channelChat.findFirst({
+        where: {
+          channelName: getMessagesDto.channelName,
+        },
+        include: {
+          messages: {
             include: {
-                messages: true
-            }
-        });
-        const message = res.messages.at(-1);
-
-        console.log(message);
-
-        if (sendMessageDto.channel) {
-            return await this.prisma.channelChat.update({
-                where: {
-                    channelName: sendMessageDto.to,
+              user: true,
+            },
+          },
+        },
+      });
+      return res?.messages;
+    } else {
+      const res = await this.prisma.directChat.findFirst({
+        where: {
+          users: {
+            every: {
+              user: {
+                name: {
+                  in: [getMessagesDto.to, getMessagesDto.from],
                 },
-                data: {
-                    messages: {
-                        connect: {
-                            id: message?.id
-                        }
-                    }
-                }
-            })
-        } else {
-            const direct = await this.prisma.directChat.findFirst({
-                where: {
-                    users: {
-                        every: {
-                            user: {
-                                name: {
-                                    in: [sendMessageDto.to, sendMessageDto.from]
-                                }
-                            }
-                        }
-                    }
-                }
-            })
-
-            return await this.prisma.directChat.update({
-                where: {
-                    id: direct?.id
-                },
-                data: {
-                    messages: {
-                        connect: {
-                            id: message?.id
-                        }
-                    }
-                }
-            })
-        }
+              },
+            },
+          },
+        },
+        include: {
+          messages: {
+            include: {
+              user: true,
+            },
+          },
+        },
+      });
+      return res?.messages;
     }
-
-    async getMessages(getMessagesDto: GetMessagesDto) {
-        if (getMessagesDto.channelName) {
-            const res = await this.prisma.channelChat.findUnique({
-                where: {
-                    channelName: getMessagesDto.channelName
-                },
-                include: {
-                    messages: {
-                        include: {
-                            user: true
-                        }
-                    }
-                }
-            });
-            return res?.messages;
-        } else {
-            const res = await this.prisma.directChat.findFirst({
-                where: {
-                    users: {
-                        every: {
-                            user: {
-                                name: {
-                                    in: [getMessagesDto.to, getMessagesDto.from]
-                                }
-                            }
-                        }
-                    }
-                },
-                include: {
-                    messages: {
-                        include: {
-                            user: true
-                        }
-                    }
-                }
-            });
-            return res?.messages;
-        }
-    }
+  }
 }
